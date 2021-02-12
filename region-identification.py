@@ -12,7 +12,7 @@
 #DATE - Started 2021/02/03
        #Version 0.5.0 2021/02/03
 
-#BUGS - Zoom mode does not work as planned. Interactions between different modes not yet well understood.
+#BUGS - Zoom mode does not work as planned. Interactions between different modes not yet well understood. 
 
 #DESCRIPTION - Program to easily identify regions with maser proper motion. Opens an interactive plot, which you can
 #zoom in, and save data points into a text file, this text file is then used by the relative_pm.py (TODO make this code) python code 
@@ -46,7 +46,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 #Note the utils file should be in your directory.
-from utils import extract_from_df,isolate
+from utils import extract_from_df,isolate,read_data
 from glob import glob
 from itertools import chain 
 from matplotlib import patches as pat
@@ -143,7 +143,8 @@ def onkey_press(event):
                     f.write(str(data_boxes) + '\n')
                 else:
                     for i in range(0,databoxnum):
-                        f.write(str(data_boxes[i])+'\n')
+                        #Saving data boxes gives unequal data format, with some lines having two square brackets instead of one.
+                        f.write(str(data_boxes[i])[1:-1]+'\n')
                 f.close()
                 data_boxes =[]
                 databoxnum = 0
@@ -252,14 +253,8 @@ mode1 = 'none' #The current mode for the plots. TODO (Put some sort of in plot i
 
 #Reads data from text files into multidimensional arrays.
 #Only need to specify the relative path to the data files folder. TODO (Make the data file location an input).
-for name in glob("data/*"):
-    df = pd.read_csv(name,sep = ',')
-    ra,dec,vlsr,flux,dflux = extract_from_df(df,cols)
-    RA.append(ra)
-    DEC.append(dec)
-    VLSR.append(vlsr)
-    FLUX.append(flux)
-    DFLUX.append(dflux)
+data_dir = 'VERA-7-epochs'
+RA,DEC,VLSR,FLUX,DFLUX = read_data(data_dir,cols)
     
 
 
