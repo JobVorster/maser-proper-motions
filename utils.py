@@ -79,12 +79,19 @@ def zero_list(arr,val = 0):
     return zero_arr
                      
 def err_min(dx,dy):
-    '''TODO INSERT DOCUMENTATION HERE'''
+    '''Calculates the resultant of two errors for plus or minus of any two errors dx, dy.'''
     df = np.sqrt(dx**2 + dy**2)
     return df
 
 def read_data(data_dir,cols):
-    '''TODO INSERT DOCUMENTATION HERE'''
+    '''Reads maser position data from textfiles in a specified directory. Note that a folder Fileorder.txt should be in the directory,
+    containing the order in which the files should be read. Be sure toe specify the entire file name in Fileorder.txt.
+    Parameters :
+    ------------
+    data_dir : string
+    Name of directory containing the maser position data and Fileorder.txt file.
+    cols : list of strings
+    Currently, cols should be set to ['RA','DEC','VLSR','FLUX','DFLUX']. As this function has not been generalized yet.'''
     RA = []
     DEC = []
     VLSR = []

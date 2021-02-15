@@ -31,7 +31,7 @@ from glob import glob
 from itertools import chain 
 from matplotlib import patches as pat
 import os
-from scipy import stats
+from scipy import stats,optimize
 import math
 
 #*******************************************************************
@@ -62,14 +62,19 @@ def maser_feature(RA,RAerr,DEC,Decerr,VLSR,xlim,ylim):
     Maser feature data for this box and vlsr, containing information on the average position of the maser feature for all epochs. The list is of the form
     [vlsr,detections,RA,RAerr,DEC,DECerr] - with vlsr being the vlsr of the maser feature (it is assumed to be constant), detections - a string signifying detections and
     RA,...,DECerr which are lists containing the average maser feature information and [99900] if the feature is not detected in that epoch.
+    INDS : 2D list
+    List of indices of the dataset that have been used to calculate the maser features. These indices should then be used to delete these data points from the input arrays. 
+    To make sure there is no double counts.
     '''
     VLSR_detections = []
     FEATURE_RA = []
     FEATURE_Dec = []
     FEATURE_RAerr = []
     FEATURE_Decerr = []
+    INDS = []
     for i in range(0,len(RA)):
         inds = isolate(RA[i],DEC[i],xlim,ylim) #indices of maser spots of specific epoch in specified box.
+        INDS.append(inds)
         isoRA = np.array(RA[i])[inds]
         isoRAerr = np.array(RAerr[i])[inds]
         isoDec = np.array(DEC[i])[inds]
@@ -90,6 +95,7 @@ def maser_feature(RA,RAerr,DEC,Decerr,VLSR,xlim,ylim):
             else:
                 feature_RAerr = round(np.std(isoRA[ind])/np.sqrt(len(ind)),6) #Uses error on the mean.
                 feature_Decerr = round(np.std(isoDec[ind])/np.sqrt(len(ind)),6)
+                
             
             #Adds the calculated feature's values to a big storage list that stores all the values.
             #The index in the collapsed version of VLSR_detections corresponds to the index of the value
@@ -97,7 +103,7 @@ def maser_feature(RA,RAerr,DEC,Decerr,VLSR,xlim,ylim):
             FEATURE_RA.append(feature_RA)
             FEATURE_Dec.append(feature_Dec)
             FEATURE_RAerr.append(feature_RAerr)
-            FEATURE_Decerr.append(feature_Dec)
+            FEATURE_Decerr.append(feature_Decerr)
             
     epoch_Flags = [0] #List containing the first index of a new epoch for the FEATURE_xx arrays.
     total_len = 0
@@ -159,10 +165,21 @@ def maser_feature(RA,RAerr,DEC,Decerr,VLSR,xlim,ylim):
         epoch_Dec = zero_list([0]*len(VLSR_detections),99900)
         epoch_RAerr = zero_list([0]*len(VLSR_detections),99900)
         epoch_Decerr = zero_list([0]*len(VLSR_detections),99900)                
-    return output
+    return output,INDS
 
 def read_maser_feature(filename,epCount):
-    '''TODO INSERT DOCUMENTATION HERE '''
+    '''Reads maser_feature output textfile into arrays that can be manipulated in code.
+    Parameters :
+    ------------
+    filename : string
+    Name of the file which the function maser_feature saved its output.
+    epCount : int
+    Number of epochs in dataset.
+    
+    Returns :
+    --------
+    vlsr,detections,ra,raerr,dec,decerr : array-like
+    Arrays read from the maser_feature text file.'''
     vlsr = []
     detections = []
     ra = np.array([])
@@ -198,10 +215,42 @@ def read_maser_feature(filename,epCount):
     decerr = np.reshape(decerr.T,newshape)
     return vlsr,detections,ra,raerr,dec,decerr
 
-#TODO Complete this function  -- 
+def lin_f(x,a,b):
+    '''Simple linear function evalueation. With x the dependant variable, a the slope and b the y-intercept. Returns the y value of a specific x value(s)'''
+    return a*x+b
+
+
+
 def calcpm(mf_RA,mf_RAerr,mf_DEC,mf_DECerr,mf_times,mf_VLSR,mf_DETECTIONS,source_Dec): 
-    '''TODO INSERT DOCUMENTATION HERE
-    Note that VLSR and detections wont be used in this function code, but will be helpful for the final saving of the data.'''
+    '''Calculates proper motions from the positions and times of different epochs. The user gives as input the positions of the maser spots
+    for different epochs, and their measurement time (in units of years) together with the source declination to calculate proper motions. Note
+    that this function works only with the output of maser_feature.
+    Parameters :
+    ------------
+    mf_RA,mf_RAerr,mf_DEC,mf_DECerr,mf_times,mf_VLSR,mf_DETECTIONS : array-like
+    Positions, errors, detection times and VLSR and detection arrays of maser features from maser_feature and read_maser_feature.
+    source_Dec : float
+    Declination of the source in degrees.
+    
+    Returns:
+    -------
+    vlsr,ra,raerr,dec,decerr,mux,muxerr,muy,muyerr,detections : array-like
+    Information on all detected proper motions.
+    
+    P.S. Note that VLSR and detections wont be used in this function, but it is helpful to return it to get all data in one line.'''
+    
+    
+    
+    #ref_no = 63
+    #print(mf_RA[ref_no][1])
+    #print(mf_DEC[ref_no][1])
+    #for i in range(0,len(mf_RA)):  # NOTE This is a piece of code that tries to move the reference maser position.
+        #for j in range(0,len(mf_RA[i])):
+            #if mf_RA[i][j] != 99900.0:
+                #if mf_RA[ref_no][j] == 99900.0:
+                    #mf_RA[i][j] -= mf_ref_no[
+                #mf_RA[i][j] -= mf_RA[ref_no][1]
+                #mf_DEC[i][j] -= mf_DEC[ref_no][1]
     datapoint_no = len(mf_RA)
     vlsr = []
     detections = []
@@ -213,31 +262,38 @@ def calcpm(mf_RA,mf_RAerr,mf_DEC,mf_DECerr,mf_times,mf_VLSR,mf_DETECTIONS,source
     muxerr =[]
     muy = []
     muyerr = []
+    
     for datapoint in range(0,datapoint_no):
         fit_RA = []
+        fit_RAerr =[]
         fit_DEC = []
+        fit_DECerr = []
         fit_VLSR = []
         fit_times =[]
         for i in range(0,len(mf_RA[datapoint])):
             if mf_RA[datapoint][i] != 99900: #Only uses the data points of detections.
                 fit_RA.append(mf_RA[datapoint][i])
+                fit_RAerr.append(mf_RAerr[datapoint][i])
                 fit_DEC.append(mf_DEC[datapoint][i])
+                fit_DECerr.append(mf_DECerr[datapoint][i])
                 fit_times.append(mf_times[i])
                 fit_VLSR.append(mf_VLSR[datapoint]) # NOTE the mf_VLSR array is only 1D
         dx = fit_RA[-1] - fit_RA[0]  #Get the magnitude of the proper motion from the displacement between the earliest and latest datapoint.
         dt = fit_times[-1] - fit_times[0]
         dy = fit_DEC[-1] - fit_DEC[0]
-        linfit = stats.linregress(fit_RA,fit_DEC) #Get the slope and error for the proper motion from linear fit.
-        slope,intercept,rvalue,pvalue,stderr = linfit
-        mux.append(dx/dt*np.cos(np.deg2rad(source_Dec))) #NOTE The cos delta factor is important for the x component of the proper motion.
-        muy.append(math.copysign(1,dy)*np.abs(slope)*np.abs(dx)/dt) #Removes the sign from the slope and dx, but uses the sign from dy.
-        ra.append(fit_RA[0])
-        dec.append(fit_DEC[0])
-        vlsr.append(fit_VLSR[0])
-        detections.append(mf_DETECTIONS[datapoint])
-        #NOTE Now it is time to consider the errors.
-        
-        
+        popt_RA,pcov_RA = optimize.curve_fit(lin_f,fit_times,fit_RA,sigma = fit_RAerr,absolute_sigma = True)  #Get the slope and error for the proper motion from linear fit.
+        perr_RA = np.sqrt(np.diag(pcov_RA)) #Magnitudes of the errors on the parameters.
+        popt_DEC,pcov_DEC = optimize.curve_fit(lin_f,fit_times,fit_DEC,sigma = fit_DECerr,absolute_sigma = True)
+        perr_DEC = np.sqrt(np.diag(pcov_DEC)) 
+        if popt_RA[0]*np.cos(np.deg2rad(source_Dec))*1e3 < 50 and perr_DEC[0]*1e3 < 50 : #NOTE This is the first part of flagging, not saving a data point if the proper motion 
+            mux.append(popt_RA[0]*np.cos(np.deg2rad(source_Dec)))                        #is unphysical
+            muxerr.append(perr_RA[0]*np.cos(np.deg2rad(source_Dec)))
+            muy.append(popt_DEC[0])
+            muyerr.append(perr_DEC[0])
+            ra.append(fit_RA[0])
+            dec.append(fit_DEC[0])
+            vlsr.append(fit_VLSR[0])
+            detections.append(mf_DETECTIONS[datapoint])
     return vlsr,ra,raerr,dec,decerr,mux,muxerr,muy,muyerr,detections
 
 #*******************************************************************
@@ -254,27 +310,29 @@ def calcpm(mf_RA,mf_RAerr,mf_DEC,mf_DECerr,mf_times,mf_VLSR,mf_DETECTIONS,source
                 #IDs should be allocated outside maser_feature.
     #DONE 1.2 -- Test the new maser_feature
     #DONE 1.3 -- Make note that the VLSR values change slightly over time.
-#TODO 2 -- Fit linear regression line onto maser features and calculate unflagged relative proper motions.
+#DONE 2 -- Fit linear regression line onto maser features and calculate unflagged relative proper motions.
     #DONE 2.1 -- Read maser features from textfile.
+        #DONE 2.1.A -- Delete maser features from data once they have been calulated. 
     #DONE 2.2 -- Check if maser features are realistic.
-    #TODO 2.3 -- Write function calculating relative proper motion using linear fit.
+    #DONE 2.3 -- Write function calculating relative proper motion using linear fit.
         #DONE 2.3.1 -- Isolate detections and do linear fit.
         #DONE 2.3.2 -- Calculate mux and muy using slopes calculated from linear fit.
-        #TODO 2.3.3 -- Calculate sigma_mux and sigma_muy using linear fit and maser_feature errors. NOTE This link has some useful information https://stackoverflow.com/questions/22670057/linear-fitting-in-python-with-uncertainty-in-both-x-and-y-coordinates
-        #TODO 2.3.4 -- Save proper motions into text file.
+        #DONE 2.3.3 -- Calculate sigma_mux and sigma_muy using linear fit and maser_feature errors. 
+        #DONE 2.3.4 -- Save proper motions into text file.
 #TODO 3 -- Correct for parallax and galactic rotation.
-    #TODO 3.1 -- Correct for peculiar motion.
-    #TODO 3.2 -- Correct for galactic rotation.
+    #TODO 3.1 -- Correct for peculiar motion. NOTE I am not sure if I need to do this.
+    #TODO 3.2 -- Correct for galactic rotation. NOTE Look at calculation in pm_correction.py
     #TODO 3.3 -- Correct for parallax.
-    #TODO 3.4 -- Correct for motion of reference maser.
+    #TODO 3.4 -- Correct for motion of reference maser. NOTE Only after AIPS data reduction.
 #TODO 4 -- Flag bad proper motions.
 #TODO 5 -- Use reference maser position to get absolute position.
 #TODO A -- Document all calculations
     #TODO A.1 -- Do all comments
         #TODO A.1.1 -- region-identification.py
-        #TODO A.1.2 -- relative_pm.py
+        #DONE FOR NOW A.1.2 -- relative_pm.py
         #TODO A.1.3 -- pm_flagging.py NOTE check name in github
         #TODO A.1.4 -- pm_correction.py NOTE check name in github.
+        #DONE A.1.5 -- utils.py
     #TODO A.2 -- Upload final version to github with explanation.
     #TODO A.3 -- Write up all calculations to MSc method.
     
@@ -304,7 +362,6 @@ databoxnum = 0
 #Reads data from text files into multidimensional arrays.
 data_dir = 'VERA-7-epochs'
 RA,DEC,VLSR,FLUX,DFLUX = read_data(data_dir,cols)
-
 #VERA positional accuracy is 10 microarcseconds, so all maser spots are initialized with this value:
 RAerr = zero_list(RA,10e-6)
 Decerr = zero_list(DEC,10e-6)
@@ -313,14 +370,37 @@ parameterfile = 'pm_pars.txt' #Filename for the boxes that serve as an input for
 if os.path.exists('maser_features.txt'):
     os.remove('maser_features.txt')  #Removes the file before it writes on it again.
 
-#
+
 #TODO Consider adding a heading to the text file.
 with open(parameterfile,'r') as f:
     for line in f:
+        new_RA = []
+        new_DEC = []
+        new_VLSR = [] #We need to delete the array elements that are used in maser feature to make sure there is no double counting of maser spots.
+        new_FLUX = []
+        new_DFLUX = []
         linestring = np.fromstring(line,dtype = float,sep = ' ,')
         xlim = linestring[0:2]
         ylim = linestring[2:]
-        output = maser_feature(RA,RAerr,DEC,Decerr,VLSR,xlim,ylim)
+        output,INDS = maser_feature(RA,RAerr,DEC,Decerr,VLSR,xlim,ylim)
+        for i in range(0,len(INDS)):
+            for j in range(0,len(RA[i])):
+                if j not in INDS[i]:
+                    new_RA.append(RA[i][j])
+                    new_DEC.append(DEC[i][j])
+                    new_VLSR.append(VLSR[i][j]) #This counts all the elements that have not been counted by maser_feature.
+                    new_FLUX.append(FLUX[i][j])
+                    new_DFLUX.append(DFLUX[i][j])
+            RA[i] = new_RA
+            DEC[i] = new_DEC
+            VLSR[i] = new_VLSR #This selects all the values that are NOT in INDS (INDS being the indices of isolated data points).
+            FLUX[i] = new_FLUX
+            DFLUX[i] = new_DFLUX
+            new_RA = []
+            new_DEC = []
+            new_VLSR = []
+            new_FLUX = []
+            new_DFLUX = []
         f2 = open('maser_features.txt','a')
         for single_feature in output:
             f2.write(str(single_feature)[1:-1] + '\n')
@@ -331,7 +411,21 @@ mf_VLSR,mf_DETECTIONS,mf_RA,mf_RAerr,mf_DEC,mf_DECerr = read_maser_feature('mase
 
 epdate_float = [2014+262.0/365.,2014 + 329./365.,2015 + 31./365.,2015 + 104./365.,2015+322./365.,2016+40./365.,2016+71./365.]
 source_Dec = -35*47./60.*1.5/3600.
+
 vlsr,ra,raerr,dec,decerr,mux,muxerr,muy,muyerr,detections = calcpm(mf_RA,mf_RAerr,mf_DEC,mf_DECerr,epdate_float,mf_VLSR,mf_DETECTIONS,source_Dec)
+#ref_no = 63
+#print(len(vlsr))
+#del vlsr[ref_no]
+#del ra[ref_no]
+#del dec[ref_no]
+#del mux[ref_no]
+#del muy[ref_no] # NOTE This piece of code is part of the code to move the reference maser position.
+#del detections[ref_no]
+
+#del raerr[ref_no]
+#del decerr[ref_no]
+#del muxerr[ref_no]
+#del muyerr[ref_no]
 
 plt.figure(figsize = (7,7))
 plotsize =7
@@ -343,6 +437,18 @@ newparams = {'figure.figsize': figsize, 'axes.grid': False,
             'font.size': 14}
 plt.rcParams.update(newparams)
 plt.gca().invert_xaxis()
+#print("Index \t Vlsr \t\t RA \t\t DEC \t\t mux (mas) \t muxerr (mas) \t muy (mas) \t muyerr (mas) \t detections \n")
+#for i in range(0,len(vlsr)):
+#    print("%d \t %0.5f \t %0.5f \t %0.5f \t %0.5f \t %0.5f \t %0.5f \t %0.5f \t %s"%(i,vlsr[i],ra[i],dec[i],mux[i]*1e3,muxerr[i]*1e3,muy[i]*1e3,muyerr[i]*1e3,detections[i]))
+    
+    
+if os.path.exists('pm_results.txt'):
+    os.remove('pm_results.txt')  #Removes the file before it writes on it again.
+with open("pm_results.txt",'a') as f:
+    f.write("Index \t Vlsr \t\t RA \t DEC \t mux (mas) \t muxerr (mas) \t muy (mas) \t muyerr (mas) \t detections \n")
+    for i in range(0,len(vlsr)):
+        f.write("%d \t %0.5f \t %0.5f \t %0.5f \t %0.5f \t %0.5f \t %0.5f \t %0.5f \t %s\n"%(i,vlsr[i],ra[i],dec[i],mux[i]*1e3,muxerr[i]*1e3,muy[i]*1e3,muyerr[i]*1e3,detections[i]))
+f.close()
 plt.quiver(ra,dec,-np.array(mux),muy,vlsr,cmap = 'jet')
 plt.xlabel("RA offset (arcsec)")
 plt.ylabel("Dec offset (arcsec)")
